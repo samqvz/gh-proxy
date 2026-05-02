@@ -26,12 +26,13 @@ const UI_HTML = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GitHub Proxy - 加速</title>
+    <title>GitHub Proxy</title>
     <style>
         :root {
             --bg-gradient: linear-gradient(-45deg, #f3f4f6, #e5e7eb, #d1d5db, #f9fafb);
             --panel-r: 255; --panel-g: 255; --panel-b: 255;
             --panel-alpha: 0.7;
+            --panel-blur: 0px; 
             --text-color: #1f2937;
             --primary: #0969da;
             --primary-hover: #0550ae;
@@ -60,11 +61,12 @@ const UI_HTML = `
         @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         
         .container, .modal {
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(var(--panel-blur)); 
+            -webkit-backdrop-filter: blur(var(--panel-blur));
             background: rgba(var(--panel-r), var(--panel-g), var(--panel-b), var(--panel-alpha)); 
             border: 1px solid var(--border);
             border-radius: 20px; box-shadow: var(--card-shadow); 
-            transition: background 0.1s ease;
+            transition: background 0.1s ease, backdrop-filter 0.2s ease, -webkit-backdrop-filter 0.2s ease;
         }
         .container {
             padding: 40px; width: 90%; max-width: 500px; position: relative;
@@ -122,10 +124,16 @@ const UI_HTML = `
         .history-item:hover { background: rgba(9, 105, 218, 0.05); border-color: var(--primary); }
         [data-theme="dark"] .history-item:hover { background: rgba(88, 166, 255, 0.05); }
 
-        .top-actions { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; transform: translateZ(50px); }
+        .top-actions { position: absolute; top: 20px; right: 20px; display: flex; gap: 5px; transform: translateZ(50px); }
+        
         .icon-btn {
             background: none; border: none; color: var(--text-color);
-            cursor: pointer; font-size: 20px; padding: 0; opacity: 0.8; transition: 0.2s;
+            cursor: pointer; 
+            font-size: 22px;
+            padding: 12px;
+            margin: -12px;
+            opacity: 0.8; transition: 0.2s;
+            -webkit-tap-highlight-color: transparent;
         }
         .icon-btn:hover { opacity: 1; transform: scale(1.1); }
 
@@ -134,13 +142,23 @@ const UI_HTML = `
             background: rgba(0,0,0,0.4); z-index: 100; display: none;
             justify-content: center; align-items: center; opacity: 0; transition: 0.3s;
         }
-        .modal { padding: 30px; width: 85%; max-width: 400px; transform: translateY(20px); transition: 0.3s; }
+        .modal { 
+            padding: 30px; width: 70%; max-width: 400px; transform: translateY(20px); transition: 0.3s;
+            background: rgba(var(--panel-r), var(--panel-g), var(--panel-b), 0.70); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
         .modal h3 { margin-top: 0; margin-bottom: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .modal-close { position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 24px; opacity: 0.5; }
+        
+        .modal-close { 
+            position: absolute; top: 15px; right: 20px; cursor: pointer; 
+            font-size: 28px; opacity: 0.5; padding: 10px; margin: -10px;
+            -webkit-tap-highlight-color: transparent;
+        }
         .modal-close:hover { opacity: 1; }
         
         input[type=range] {
-            -webkit-appearance: none; background: rgba(0,0,0,0.1); border-radius: 5px; height: 6px; outline: none;
+            -webkit-appearance: none; background: rgba(0,0,0,0.1); border-radius: 5px; height: 6px; outline: none; margin-top: 5px;
         }
         [data-theme="dark"] input[type=range] { background: rgba(255,255,255,0.2); }
         input[type=range]::-webkit-slider-thumb {
@@ -212,26 +230,34 @@ const UI_HTML = `
             <div class="modal-close" onclick="closeBgModal()">×</div>
             <h3 style="font-size: 16px;">设置</h3>
             
-            <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
-                <label style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px;">
-                    <span>🎛️ 面板透明度</span>
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                    <span>面板透明度</span>
                     <span id="transparencyVal">默认</span>
                 </label>
                 <input type="range" id="transparencySlider" min="0" max="100" value="30" style="width: 100%; cursor: pointer;" oninput="adjustTransparency(this.value)">
             </div>
+
+            <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                <label style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                    <span>面板模糊度</span>
+                    <span id="blurVal">0px</span>
+                </label>
+                <input type="range" id="blurSlider" min="0" max="50" value="0" style="width: 100%; cursor: pointer;" oninput="adjustBlur(this.value)">
+            </div>
             
             <button class="btn btn-outline" style="width: 100%; margin-bottom: 15px;" onclick="document.getElementById('bgUpload').click()">
-                📁 上传本地图片
+                上传本地图片
             </button>
             <input type="file" id="bgUpload" accept="image/*" style="display:none" onchange="handleBgUpload(event)">
             
             <div style="text-align: center; margin-bottom: 15px; font-size: 12px; opacity: 0.5;">或者使用网络图片 URL</div>
             
             <input type="text" id="bgApiUrl" placeholder="输入图片 URL" style="margin-bottom: 10px;">
-            <button class="btn btn-outline" style="width: 100%; margin-bottom: 15px;" onclick="applyBgApi()">🧩 应用网络壁纸</button>
+            <button class="btn btn-outline" style="width: 100%; margin-bottom: 15px;" onclick="applyBgApi()">应用网络壁纸</button>
             
             <button class="btn btn-outline" style="width: 100%; color: var(--error-color); border-color: var(--error-color);" onmouseover="this.style.background='var(--error-color)'; this.style.color='#fff'" onmouseout="this.style.background='transparent'; this.style.color='var(--error-color)'" onclick="clearBg()">
-                🗑️ 恢复默认背景
+                恢复默认背景与设置
             </button>
         </div>
     </div>
@@ -269,6 +295,23 @@ const UI_HTML = `
             localStorage.setItem('panel_transparency', val);
         }
 
+        const savedBlur = localStorage.getItem('panel_blur');
+        if (savedBlur !== null) {
+            document.documentElement.style.setProperty('--panel-blur', savedBlur + 'px');
+            document.getElementById('blurSlider').value = savedBlur;
+            document.getElementById('blurVal').innerText = savedBlur + 'px';
+        } else {
+            document.documentElement.style.setProperty('--panel-blur', '0px');
+            document.getElementById('blurSlider').value = 0;
+            document.getElementById('blurVal').innerText = '0px';
+        }
+
+        function adjustBlur(val) {
+            document.documentElement.style.setProperty('--panel-blur', val + 'px');
+            document.getElementById('blurVal').innerText = val + 'px';
+            localStorage.setItem('panel_blur', val);
+        }
+
         const savedBg = localStorage.getItem('custom_bg');
         if (savedBg) applyCustomBg(savedBg, false);
 
@@ -290,13 +333,19 @@ const UI_HTML = `
         function clearBg() {
             document.body.style = ''; 
             localStorage.removeItem('custom_bg');
+            
             localStorage.removeItem('panel_transparency');
             document.documentElement.style.removeProperty('--panel-alpha');
             const currentTheme = document.documentElement.getAttribute('data-theme');
             document.getElementById('transparencyVal').innerText = currentTheme === 'dark' ? '40%' : '30%';
             document.getElementById('transparencySlider').value = currentTheme === 'dark' ? 40 : 30;
             
-            showToast('已恢复默认流光背景');
+            localStorage.removeItem('panel_blur');
+            document.documentElement.style.setProperty('--panel-blur', '0px');
+            document.getElementById('blurVal').innerText = '0px';
+            document.getElementById('blurSlider').value = 0;
+
+            showToast('已恢复默认背景与设置');
             closeBgModal();
         }
 
