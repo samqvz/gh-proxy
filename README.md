@@ -1,118 +1,72 @@
-# gh-proxy
+# github-proxy
 
-## 简介
+* `github-proxy` 是一个部署在 Cloudflare  Workers 的 GitHub 代理服务，适合个人或小团队使用，底层路由逻辑基于 [hunshcn/gh-proxy](https://github.com/hunshcn/gh-proxy)重构。如有大需求请参考原项目另外的部署方式。
+* 修改原因：把一些常用的网站交由自己把控，避免不稳定等情况（还有就是，不想看到广告）。
 
-github release、archive以及项目文件的加速项目，支持clone，有Cloudflare Workers无服务器版本以及Python版本
+---
 
-## 演示
+## 简体中文
 
-[https://gh.api.99988866.xyz/](https://gh.api.99988866.xyz/)
+### 简介
+* 单文件部署，操作简单，无需额外设置。
+* 主要用于解决 GitHub 资源加载缓慢、API 速率限制以及前端跨域（CORS）拦截等问题。
+* 部署前，可以在 `index.js` 文件的顶部，根据自己的实际需求修改以下常量：
 
-演示站为公共服务，如有大规模使用需求请自行部署，演示站有点不堪重负
+```javascript
+// 代理服务的 URL 路径前缀设置 (默认: '/')，即为 `https://你的域名/`。
+// 如果想将其设置特定的子路径，例如 `https://你的域名/proxy/`，请将其修改为 '/proxy/'。
+const PREFIX = '/'
 
-![imagea272c95887343279.png](https://img.maocdn.cn/img/2021/04/24/imagea272c95887343279.png)
-
-当然也欢迎[捐赠](#捐赠)以支持作者
-
-## python版本和cf worker版本差异
-
-- python版本支持进行文件大小限制，超过设定返回原地址 [issue #8](https://github.com/hunshcn/gh-proxy/issues/8)
-
-- python版本支持特定user/repo 封禁/白名单 以及passby [issue #41](https://github.com/hunshcn/gh-proxy/issues/41)
-
-## 使用
-
-直接在copy出来的url前加`https://gh.api.99988866.xyz/`即可
-
-也可以直接访问，在input输入
-
-***大量使用请自行部署，以上域名仅为演示使用。***
-
-访问私有仓库可以通过
-
-`git clone https://user:TOKEN@ghproxy.com/https://github.com/xxxx/xxxx` [#71](https://github.com/hunshcn/gh-proxy/issues/71)
-
-以下都是合法输入（仅示例，文件不存在）：
-
-- 分支源码：https://github.com/hunshcn/project/archive/master.zip
-
-- release源码：https://github.com/hunshcn/project/archive/v0.1.0.tar.gz
-
-- release文件：https://github.com/hunshcn/project/releases/download/v0.1.0/example.zip
-
-- 分支文件：https://github.com/hunshcn/project/blob/master/filename
-
-- commit文件：https://github.com/hunshcn/project/blob/1111111111111111111111111111/filename
-
-- gist：https://gist.githubusercontent.com/cielpy/351557e6e465c12986419ac5a4dd2568/raw/cmd.py
-
-## cf worker版本部署
-
-首页：https://workers.cloudflare.com
-
-注册，登陆，`Start building`，取一个子域名，`Create a Worker`。
-
-复制 [index.js](https://cdn.jsdelivr.net/gh/hunshcn/gh-proxy@master/index.js)  到左侧代码框，`Save and deploy`。如果正常，右侧应显示首页。
-
-`ASSET_URL`是静态资源的url（实际上就是现在显示出来的那个输入框单页面）
-
-`PREFIX`是前缀，默认（根路径情况为"/"），如果自定义路由为example.com/gh/*，请将PREFIX改为 '/gh/'，注意，少一个杠都会错！
-
-## Python版本部署
-
-### Docker部署
-
-```
-docker run -d --name="gh-proxy-py" \
-  -p 0.0.0.0:80:80 \
-  --restart=always \
-  hunsh/gh-proxy-py:latest
+// 最大文件代理大小限制 (单位：字节)。0 表示无限制。
+// 提示：如果使用此项目并作为公开节点提供服务，建议设置此值以防带宽滥用。
+// 例如：限制为 50MB，则修改为 52428800 (50 * 1024 * 1024)。
+const MAX_FILE_SIZE = 0 
 ```
 
-第一个80是你要暴露出去的端口
+### 部署流程 (Cloudflare Workers)
+1. 登录 Cloudflare 控制台。
+2. 导航至 `Workers 和 Pages`，点击 `创建应用程序` -> `创建 Worker`。
+3. 设定项目名称并点击 `部署`。
+4. 点击 `编辑代码`，清空编辑器内的所有默认代码。
+5. 将本项目中的 `index.js` 完整代码复制并粘贴到左侧编辑器中。
+6. 点击右上角 `保存并部署`。
+7. 在 `域` 页面可以找到默认生成的 `workers.dev` 访问链接。建议在此页面添加 `自定义域` 以防默认域名被 DNS 污染，并关闭默认生成的 `workers.dev` 访问权限。
 
-### 直接部署
+### 限制说明
+运行于 Cloudflare 免费生态：
+* 每日请求上限：100,000 次。
+* 并发速率限制：1,000 次 / 分钟。
 
-安装依赖（请使用python3）
+---
 
-```pip install flask requests```
+## English
 
-按需求修改`app/main.py`的前几项配置
+### Description
+* Single-file deployment; simple to operate, with no additional configuration required.
+* It is built to bypass network restrictions, mitigate API rate limits, and resolve Cross-Origin Resource Sharing (CORS) issues when fetching GitHub assets. 
+* Before deployment, you can modify the following constants at the top of the `index.js` file according to your specific needs::
 
-*注意:* 可能需要在`return Response`前加两行
-```python3
-if 'Transfer-Encoding' in headers:
-    headers.pop('Transfer-Encoding')
+```javascript
+// Proxy service URL path prefix setting (Default: '/'), which maps to `https://yourdomain.com/`.
+// If you want to set it to a specific subpath, e.g., `https://yourdomain.com/proxy/`, please change it to '/proxy/'.
+const PREFIX = '/'
+
+// Maximum file proxy size limit (in bytes). 0 means unlimited.
+// Tip: If you are hosting this project as a public node, it is highly recommended to set this value to prevent bandwidth abuse.
+// For example: To limit the size to 50MB, modify it to 52428800 (50 * 1024 * 1024).
+const MAX_FILE_SIZE = 0 
 ```
 
-### 注意
+### Deployment (Cloudflare Workers)
+1. Log in to the Cloudflare Dashboard.
+2. Go to `Workers & Pages`, click `Create application`, then `Create Worker`.
+3. Name your worker and click `Deploy`.
+4. Click `Edit code` and delete all default code in the editor.
+5. Paste the entire contents of `index.js` from this repository into the editor.
+6. Click `Save and deploy`.
+7. Navigate to `Domains` find your default `.workers.dev` route. It is highly recommended to add a `Custom Domain` on this page for better accessibility, And disable the default `workers.dev` access.
 
-python版本的机器如果无法正常访问github.io会启动报错，请自行修改静态文件url
-
-python版本默认走服务器（2021.3.27更新）
-
-## Cloudflare Workers计费
-
-到 `overview` 页面可参看使用情况。免费版每天有 10 万次免费请求，并且有每分钟1000次请求的限制。
-
-如果不够用，可升级到 $5 的高级版本，每月可用 1000 万次请求（超出部分 $0.5/百万次请求）。
-
-## Changelog
-
-* 2020.04.10 增加对`raw.githubusercontent.com`文件的支持
-* 2020.04.09 增加Python版本（使用Flask）
-* 2020.03.23 新增了clone的支持
-* 2020.03.22 初始版本
-
-## 链接
-
-[我的博客](https://hunsh.net)
-
-## 参考
-
-[jsproxy](https://github.com/EtherDream/jsproxy/)
-
-## 捐赠
-
-![wx.png](https://img.maocdn.cn/img/2021/04/24/image.md.png)
-![ali.png](https://www.helloimg.com/images/2021/04/24/BK9vmb.md.png)
+### Limits
+Subject to Cloudflare's free tier quotas:
+* Daily request limit: 100,000 requests.
+* Burst rate limit: 1,000 requests per minute.
