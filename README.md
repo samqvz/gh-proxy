@@ -20,7 +20,16 @@ const PREFIX = '/'
 // 最大文件代理大小限制 (单位：字节)。0 表示无限制。
 // 提示：如果使用此项目并作为公开节点提供服务，建议设置此值以防带宽滥用。
 // 例如：限制为 50MB，则修改为 52428800 (50 * 1024 * 1024)。
-const MAX_FILE_SIZE = 0 
+const MAX_FILE_SIZE = 0
+
+// 新增配置项：CUSTOM_BASE_URL。
+// 在此填入想要精简的 URL 链接片段，即可实现短链访问。
+// 示例：
+// 原链接     ：https://github.com/用户名/仓库名/分支名/剩余文件名
+// 填入       ：https://github.com/用户名/仓库名/分支名/
+// 即可以此访问：https://你的域名/剩余文件名
+// 留空（''）则关闭此功能。
+const CUSTOM_BASE_URL = ''
 ```
 
 ### 部署流程 (Cloudflare Workers)

@@ -4,6 +4,8 @@ const PREFIX = '/'
 
 const MAX_FILE_SIZE = 0
 
+const CUSTOM_BASE_URL = ''
+
 const CORS_HEADERS = {
     'access-control-allow-origin': '*',
     'access-control-allow-methods': 'GET,POST,PUT,PATCH,TRACE,DELETE,HEAD,OPTIONS',
@@ -162,7 +164,6 @@ const UI_HTML = `
         let cmdHistory = []
         try { cmdHistory = JSON.parse(localStorage.getItem('term_history') || '[]') } catch(e) {}
         let historyIndex = cmdHistory.length
-
         function saveHistory(val) {
             if (!val) return
             cmdHistory = cmdHistory.filter(c => c !== val)
@@ -171,11 +172,10 @@ const UI_HTML = `
             localStorage.setItem('term_history', JSON.stringify(cmdHistory))
             historyIndex = cmdHistory.length
         }
-
         input.addEventListener('input', () => { processCommand(); historyIndex = cmdHistory.length })
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                let cleanVal = input.value.replace(/\\s+/g, '')
+                let cleanVal = input.value.trim()
                 if (cleanVal) saveHistory(cleanVal)
                 execDownload()
             }
@@ -205,9 +205,8 @@ const UI_HTML = `
                 }
             }
         })
-
         function processCommand() {
-            let val = input.value.replace(/\\s+/g, '')
+            let val = input.value.trim()
             statusMsg.style.visibility = 'hidden'
             if (!val) {
                 outputBox.style.display = 'none'
@@ -215,7 +214,7 @@ const UI_HTML = `
                 return
             }
             const valLower = val.toLowerCase()
-            const isValid = valLower.includes('github.com') || valLower.includes('githubusercontent.com') || valLower.includes('gist.') || /^[a-zA-Z0-9_-]+\\/[a-zA-Z0-9_.-]+\\//.test(val)
+            const isValid = valLower.includes('github.com') || valLower.includes('githubusercontent.com') || valLower.includes('gist.') || /^[a-zA-Z0-9_-]+\\/[a-zA-Z0-9_.-]+(\\/.*)?$/.test(val)
             if (!isValid) {
                 outputBox.style.display = 'none'
                 errorBox.style.display = 'block'
@@ -229,10 +228,9 @@ const UI_HTML = `
             } else {
                 infoStr.innerHTML = '>> TYPE: Standard Path Routing'
             }
-            let target = val.replace(/^(?:https?:\\/\\/)?(github\\.com|raw\\.githubusercontent\\.com|gist\\.github\\.com|gist\\.githubusercontent\\.com|raw\\.github\\.com)\\//i, '')
+            let target = val.replace(/^(?:https?:\\/\\/)?(github\\.com|raw\\.githubusercontent\\.com|gist\\.github\\.com|gist\\.github\\.com|gist\\.githubusercontent\\.com|raw\\.github\\.com)\\//i, '')
             resultOutput.value = window.location.origin + '/' + target.replace(/^\\/+/, '')
         }
-
         let sysTimer
         function showSysMsg(msg) {
             statusMsg.innerText = '> ' + msg
@@ -240,25 +238,27 @@ const UI_HTML = `
             clearTimeout(sysTimer)
             sysTimer = setTimeout(() => { statusMsg.style.visibility = 'hidden' }, 2000)
         }
-
         function execCopy() {
             if (!resultOutput.value) return
             resultOutput.select()
             document.execCommand('copy')
-            let cleanVal = input.value.replace(/\\s+/g, '')
+            let cleanVal = input.value.trim()
             saveHistory(cleanVal)
             showSysMsg('Copied to clipboard. Ready for execution.')
             input.focus()
         }
-
         function execDownload() {
             if (!resultOutput.value) return
-            let cleanVal = input.value.replace(/\\s+/g, '')
+            let cleanVal = input.value.trim()
             saveHistory(cleanVal)
             showSysMsg('Initiating download protocol...')
-            setTimeout(() => { window.open(resultOutput.value, '_blank') }, 300)
+            const a = document.createElement('a')
+            a.href = resultOutput.value
+            a.target = '_blank'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
         }
-        
         document.addEventListener('click', (e) => {
             if (e.target.tagName !== 'BUTTON') input.focus()
         })
@@ -273,15 +273,12 @@ export default {
             if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS })
             const url = new URL(request.url)
             let path = url.pathname.slice(PREFIX.length)
-            
             if (path === '' || path === '/') {
                 return new Response(UI_HTML, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } })
             }
             if (path === 'favicon.ico') return new Response(null, { status: 204 })
-
             let targetUrl = resolveGitHubUrl(path)
             if (!targetUrl) return new Response('[FATAL] Invalid Request Format\n', { status: 400, headers: {'Content-Type':'text/plain'} })
-            
             if (url.search) targetUrl += url.search
             return await proxyRequest(request, targetUrl, url.origin)
         } catch (err) {
@@ -303,9 +300,15 @@ function resolveGitHubUrl(path) {
         } else if (segments.length >= 4) {
             path = 'raw.githubusercontent.com/' + path
         } else {
-            path = 'github.com/' + path
+            if (CUSTOM_BASE_URL) {
+                const base = CUSTOM_BASE_URL.endsWith('/') ? CUSTOM_BASE_URL : CUSTOM_BASE_URL + '/'
+                return base + path
+            } else {
+                path = 'github.com/' + path
+            }
         }
     }
+    
     return 'https://' + path.replace(/\/blob\//, '/raw/')
 }
 
@@ -322,17 +325,15 @@ async function proxyRequest(originalRequest, targetUrl, workerOrigin) {
     
     if (MAX_FILE_SIZE > 0 && responseHeaders.has('content-length')) {
         const contentLength = parseInt(responseHeaders.get('content-length'), 10)
-        if (contentLength > MAX_FILE_SIZE) {
+        if (!isNaN(contentLength) && contentLength > MAX_FILE_SIZE) {
             const errorMsg = `[FORBIDDEN] Target file size (${contentLength} bytes) exceeds the configured proxy limit of ${MAX_FILE_SIZE} bytes.\n`
             return new Response(errorMsg, { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
         }
     }
-
     if (response.status === 404 || response.status >= 500) {
         const errorMsg = `[FATAL ERROR] ${response.status}\n=========================================\nTarget : ${targetUrl}\nStatus : Upstream resource offline or not found\n\nEOF\n`
         return new Response(errorMsg, { status: response.status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
     }
-
     if (responseHeaders.has('location')) {
         let redirectUrl = responseHeaders.get('location')
         if (/^(?:https?:\/\/)?(?:github\.com|raw\.githubusercontent\.com|gist\.github\.com|gist\.githubusercontent\.com|raw\.github\.com)/i.test(redirectUrl)) {
